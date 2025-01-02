@@ -1,4 +1,9 @@
+import sqlite3
+import re
+
 from PyQt5 import QtWidgets, QtCore
+from utils import session
+from dashboard import DashboardPage
 
 
 class RegisterPage(QtWidgets.QMainWindow):
@@ -21,7 +26,7 @@ class RegisterPage(QtWidgets.QMainWindow):
         self.name_input_layout.setContentsMargins(0, 0, 0, 0)
 
         self.name_label = QtWidgets.QLabel(self.name_input_widget)
-        self.name_label.setText("Full Name:")
+        self.name_label.setText("Username:")
         self.name_input_layout.addWidget(self.name_label)
 
         self.name_input = QtWidgets.QLineEdit(self.name_input_widget)
@@ -72,6 +77,7 @@ class RegisterPage(QtWidgets.QMainWindow):
         self.register_button = QtWidgets.QPushButton(self.central_widget)
         self.register_button.setGeometry(QtCore.QRect(50, 330, 100, 30))
         self.register_button.setText("Register")
+        self.register_button.clicked.connect(self.register_user)
 
         self.cancel_button = QtWidgets.QPushButton(self.central_widget)
         self.cancel_button.setGeometry(QtCore.QRect(300, 330, 100, 30))
@@ -103,5 +109,54 @@ class RegisterPage(QtWidgets.QMainWindow):
         self.close()
         self.login_window.show()
 
-    def close_page(self, event):
+    def open_dashboard(self):
+        self.dashboard_window = DashboardPage()
+        self.dashboard_window.show()
         self.close()
+
+    def register_user(self):
+        # Get input values
+        username = self.name_input.text()
+        email = self.email_input.text()
+        password = self.password_input.text()
+
+        # Validate inputs
+        if not username or not email or not password:
+            QtWidgets.QMessageBox.warning(self, "Input Error", "All fields are required!")
+            return
+
+        email_regex = r'^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$'
+        if not re.match(email_regex, email):
+            QtWidgets.QMessageBox.warning(self, "Invalid Email",
+                                          '''
+The email must contain '@' and '.'  
+For example: test@example.com
+                                        ''')
+            return
+
+        # Insert into the database
+        try:
+            connection = sqlite3.connect("users.db")
+            cursor = connection.cursor()
+            hashed_password = session.pwd_context.hash(password)
+
+            cursor.execute("""
+            INSERT INTO users (username, email, password)
+            VALUES (?, ?, ?)
+            """, (username, email, hashed_password))
+
+            connection.commit()
+            connection.close()
+
+            QtWidgets.QMessageBox.information(self, "Success", "Registration successful!")
+            session_manager.username = username.capitalize()
+            session_manager.email = email
+            self.name_input.clear()
+            self.email_input.clear()
+            self.password_input.clear()
+            self.close()
+            self.open_dashboard()
+        except sqlite3.IntegrityError:
+            QtWidgets.QMessageBox.warning(self, "Error", "Email already exists!")
+        except Exception as e:
+            QtWidgets.QMessageBox.critical(self, "Error", f"An error occurred: {e}")

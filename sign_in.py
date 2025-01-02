@@ -1,4 +1,11 @@
+import re
+import sqlite3
+
 from PyQt5 import QtCore, QtWidgets
+from passlib.context import CryptContext
+
+from utils import session
+from dashboard import DashboardPage
 
 
 class LoginPage(QtWidgets.QMainWindow):
@@ -45,6 +52,7 @@ class LoginPage(QtWidgets.QMainWindow):
         self.login_button = QtWidgets.QPushButton(self.central_widget)
         self.login_button.setGeometry(QtCore.QRect(50, 200, 100, 30))
         self.login_button.setText("Login")
+        self.login_button.clicked.connect(self.login_user)
 
         self.cancel_button = QtWidgets.QPushButton(self.central_widget)
         self.cancel_button.setGeometry(QtCore.QRect(300, 200, 100, 30))
@@ -74,3 +82,60 @@ class LoginPage(QtWidgets.QMainWindow):
     def open_register(self, event):
         self.close()
         self.register_window.show()
+
+    def open_dashboard(self):
+        self.dashboard_window = DashboardPage()
+        self.dashboard_window.show()
+        self.close()
+
+    def login_user(self):
+        # Get input values
+        email = self.email_input.text()
+        password = self.password_input.text()
+
+        # Validate inputs
+        if not email or not password:
+            QtWidgets.QMessageBox.warning(self, "Input Error", "Both fields are required!")
+            return
+
+        # Validate email format
+        email_regex = r'^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$'
+        if not re.match(email_regex, email):
+            QtWidgets.QMessageBox.warning(self, "Invalid Email",
+                                          '''
+The email must contain '@' and '.'  
+For example: test@example.com
+                                          ''')
+            return
+
+        # Check credentials in the database
+        try:
+            connection = sqlite3.connect("users.db")
+            cursor = connection.cursor()
+
+            # Retrieve the stored hashed password for the given email
+            # Retrieve the stored hashed password for the given email
+            cursor.execute("""
+                    SELECT id, username, password, picture FROM users WHERE email = ?
+                """, (email,))
+            result = cursor.fetchone()
+            connection.close()
+
+            if result is None:
+                print("No such user found!")
+                return None
+
+            user_id, username, stored_password, picture = result
+
+            session.picture = picture
+
+            # Verify the provided password against the stored hash
+            if session.pwd_context.verify(password, stored_password):
+                session.start_session(user_id, username, email)
+                QtWidgets.QMessageBox.information(self, "Success", "Login successful!")
+                self.open_dashboard()
+            else:
+                QtWidgets.QMessageBox.warning(self, "Error", "Invalid email or password!")
+
+        except Exception as e:
+            QtWidgets.QMessageBox.critical(self, "Error", f"An error occurred: {e}")

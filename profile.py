@@ -1,6 +1,12 @@
-from PyQt5.QtWidgets import QWidget, QLabel, QVBoxLayout, QPushButton, QFileDialog, QSpacerItem, QSizePolicy
+import sqlite3
+
+from PyQt5 import QtCore
+from PyQt5.QtWidgets import QWidget, QLabel, QVBoxLayout, QPushButton, QFileDialog, QSpacerItem, QSizePolicy, \
+    QMessageBox
 from PyQt5.QtGui import QPixmap, QPainterPath, QPainter
 from PyQt5.QtCore import Qt
+from utils import session
+
 
 class ProfilePage(QWidget):
     def __init__(self):
@@ -20,8 +26,14 @@ class ProfilePage(QWidget):
             font-size: 12px;
             font-weight: bold;
         """)
+
         self.profile_picture_label.setAlignment(Qt.AlignCenter)
-        self.profile_picture_label.setText("No Picture")
+
+        if session.picture:
+            pixmap = QPixmap(session.picture)
+            self.set_rounded_profile_picture(pixmap)
+        else:
+            self.profile_picture_label.setText("No Picture")
 
         # Upload Button
         upload_button = QPushButton("Upload Picture")
@@ -44,9 +56,9 @@ class ProfilePage(QWidget):
         spacer = QSpacerItem(20, 40, QSizePolicy.Minimum, QSizePolicy.Expanding)
 
         # User Info Section
-        user_info = QLabel("""
-            <p style="font-size: 16px; font-weight: bold; color: #2C3E50;">John Doe</p>
-            <p style="font-size: 14px; color: #7F8C8D;">Email: johndoe@example.com</p>
+        user_info = QLabel(f"""
+            <p style="font-size: 16px; font-weight: bold; color: #2C3E50;">{session.username}</p>
+            <p style="font-size: 14px; color: #7F8C8D;">Email: {session.email}</p>
         """)
         user_info.setAlignment(Qt.AlignCenter)
         user_info.setStyleSheet("background-color: #ECF0F1; border-radius: 10px; padding: 10px;")
@@ -58,12 +70,6 @@ class ProfilePage(QWidget):
         layout.addWidget(user_info)
 
         self.setLayout(layout)
-
-    def upload_picture(self):
-        file_name, _ = QFileDialog.getOpenFileName(self, "Upload Profile Picture", "", "Images (*.png *.xpm *.jpg *.jpeg)")
-        if file_name:
-            pixmap = QPixmap(file_name)
-            self.set_rounded_profile_picture(pixmap)
 
     def set_rounded_profile_picture(self, pixmap):
         pixmap = pixmap.scaled(150, 150, Qt.KeepAspectRatioByExpanding, Qt.SmoothTransformation)
@@ -80,3 +86,21 @@ class ProfilePage(QWidget):
         self.profile_picture_label.setPixmap(rounded_pixmap)
         self.profile_picture_label.setStyleSheet("border-radius: 75px; border: 2px solid #2C3E50;")
 
+    def upload_picture(self):
+        file_dialog = QFileDialog()
+        picture_path, _ = file_dialog.getOpenFileName(self, "Select New Profile Picture", "",
+                                                      "Images (*.png *.jpg *.jpeg)")
+
+        if picture_path:
+            connection = sqlite3.connect("users.db")
+            cursor = connection.cursor()
+            cursor.execute("""
+                UPDATE users SET picture = ? WHERE id = ?
+            """, (picture_path, session.user_id))
+            connection.commit()
+            connection.close()
+
+            session.picture = picture_path  # Update session
+            QMessageBox.information(self, "Success", "Profile picture updated!")
+        else:
+            QMessageBox.warning(self, 'Error', 'An error occured while updating your profile picture. Please, try again later')

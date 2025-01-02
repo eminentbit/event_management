@@ -1,8 +1,17 @@
+import sqlite3
+
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QScrollArea, QFrame, QLabel, QLineEdit,
-    QPushButton, QCheckBox, QHBoxLayout
+    QPushButton, QCheckBox, QHBoxLayout, QMessageBox
 )
-from PyQt5.QtCore import Qt
+
+from utils import session
+
+
+def toggle_password_visibility(show: bool, *inputs):
+    """Toggle visibility of password fields."""
+    for input_field in inputs:
+        input_field.setEchoMode(QLineEdit.Normal if show else QLineEdit.Password)
 
 
 class SettingsPage(QWidget):
@@ -66,7 +75,7 @@ class SettingsPage(QWidget):
         show_password_checkbox = QCheckBox("Show Password")
         show_password_checkbox.setStyleSheet("font-size: 14px; color: #7F8C8D;")
         show_password_checkbox.stateChanged.connect(
-            lambda: self.toggle_password_visibility(
+            lambda: toggle_password_visibility(
                 show_password_checkbox.isChecked(), new_password_input, confirm_password_input
             )
         )
@@ -106,24 +115,51 @@ class SettingsPage(QWidget):
         main_layout.addWidget(settings_page)
         self.setLayout(main_layout)
 
-    def toggle_password_visibility(self, show: bool, *inputs):
-        """Toggle visibility of password fields."""
-        for input_field in inputs:
-            input_field.setEchoMode(QLineEdit.Normal if show else QLineEdit.Password)
-
     def change_password(self, new_password_input, confirm_password_input):
         """Validate and change password."""
         new_password = new_password_input.text()
         confirm_password = confirm_password_input.text()
 
-        if len(new_password) < 8:
-            self.show_error_message("Password must be at least 8 characters long.")
+        if len(new_password) < 6:
+            self.show_error_message("Password must be at least 6 characters long.")
             return
         if new_password != confirm_password:
             self.show_error_message("Passwords do not match.")
             return
 
+        connection = sqlite3.connect('users.db')
+
+        cursor = connection.cursor()
+
         # Assuming password is successfully changed
+        cursor.execute("""
+               SELECT password FROM users WHERE id = ?
+           """, (session.user_id,))
+        result = cursor.fetchone()
+        connection.close()
+
+        if result is None:
+            QMessageBox.warning(self, "Error", "User not found!")
+            return
+
+        stored_password = result[0]
+
+        # Verify current password
+        if not session.pwd_context.verify(new_password_input, stored_password):
+            QMessageBox.warning(self, "Error", "Current password is incorrect!")
+            return
+
+        # Hash new password
+        hashed_new_password = session.pwd_context.hash(new_password)
+
+        # Update password in the database
+        connection = sqlite3.connect("users.db")
+        cursor = connection.cursor()
+        cursor.execute("""
+               UPDATE users SET password = ? WHERE id = ?
+           """, (hashed_new_password, session.user_id))
+        connection.commit()
+        connection.close()
         self.show_success_message("Password changed successfully!")
 
     def show_error_message(self, message):

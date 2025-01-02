@@ -1,14 +1,16 @@
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QHBoxLayout, QVBoxLayout, QListWidget, QStackedWidget,
-    QFrame, QWidget, QPushButton, QSpacerItem, QSizePolicy
+    QFrame, QWidget, QPushButton, QSpacerItem, QSizePolicy, QMessageBox
 )
-from home import HomePage
+
 from events import EventsPage
-from settings import SettingsPage
+from home import HomePage
 from profile import ProfilePage
+from utils import session
+from settings import SettingsPage
 
 
-class MainDashboard(QMainWindow):
+class DashboardPage(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Event Management Dashboard")
@@ -99,13 +101,13 @@ class MainDashboard(QMainWindow):
         main_layout.addLayout(content_layout)
 
     def logout(self):
-        """Handle logout functionality."""
-        print("User logged out!")
+        session.end_session()
+        QMessageBox.information(None, "Logout Successful", "You have been logged out.")
         self.close()
 
 
 if __name__ == "__main__":
     app = QApplication([])
-    window = MainDashboard()
-    window.show()
+    dashboard = DashboardPage()
+    dashboard.show()
     app.exec_()
