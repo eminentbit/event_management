@@ -122,7 +122,7 @@ For example: test@example.com
             connection.close()
 
             if result is None:
-                print("No such user found!")
+                QtWidgets.QMessageBox.critical(self, 'Error', 'No such user found')
                 return None
 
             user_id, username, stored_password, picture = result
