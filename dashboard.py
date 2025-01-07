@@ -5,7 +5,7 @@ from PyQt5.QtWidgets import (
 
 from events import EventsPage
 from home import HomePage
-from profile import ProfilePage
+from user_profile import ProfilePage
 from utils import session
 from settings import SettingsPage
 
